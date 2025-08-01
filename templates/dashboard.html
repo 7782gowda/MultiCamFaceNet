@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Face Recognition Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 200px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #camera-section {
+            margin-top: 30px;
+        }
+        video {
+            border: 2px solid #444;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎥 Face Recognition Dashboard</h1>
+
+    <form id="add-person-form">
+        <input type="text" id="person-name" placeholder="Enter name" required>
+        <button type="submit">Add Person</button>
+    </form>
+
+    <div id="camera-section" style="display:none;">
+        <h3>📸 Capturing Face (5 images)...</h3>
+        <video id="video" autoplay playsinline width="320" height="240"></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+
+    <div>
+        <button onclick="startVideo()">▶️ Start Recognition</button>
+        <button onclick="stopVideo()">⏹️ Stop Recognition</button>
+    </div>
+
+    <script>
+        const form = document.getElementById('add-person-form');
+        const nameInput = document.getElementById('person-name');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const cameraSection = document.getElementById('camera-section');
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const name = nameInput.value.trim();
+            if (!name) return alert("Please enter a name.");
+
+            // Show camera section
+            cameraSection.style.display = 'block';
+
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+
+            let count = 0;
+            const totalImages = 5;
+
+            const captureInterval = setInterval(() => {
+                if (count >= totalImages) {
+                    clearInterval(captureInterval);
+                    stream.getTracks().forEach(track => track.stop());
+                    alert("✅ Face images captured and sent.");
+                    cameraSection.style.display = 'none';
+                    return;
+                }
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+
+                canvas.toBlob(blob => {
+                    const formData = new FormData();
+                    formData.append('image', blob, `${name}_${count + 0}.jpg`);
+                    formData.append('name', name);
+
+                    fetch('/upload_face', {
+                        method: 'POST',
+                        body: formData
+                    }).then(res => {
+                        if (!res.ok) console.error('Upload failed');
+                    });
+                }, 'image/jpeg');
+
+                count++;
+            }, 1000);
+        };
+
+        function startVideo() {
+            fetch('/start_video', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => alert('✅ Video recognition started!'))
+                .catch(err => alert('❌ Failed to start: ' + err));
+        }
+
+        function stopVideo() {
+            fetch('/stop_video', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => alert('🛑 Video recognition stopped.'))
+                .catch(err => alert('❌ Failed to stop: ' + err));
+        }
+    </script>
+
+</body>
+</html>
